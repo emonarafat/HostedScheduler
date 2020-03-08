@@ -6361,3 +6361,374 @@ LIMIT 1
 2020-03-08 19:23:46.168 +06:00 [INF] Request finished in 5.6597ms 200 application/json
 2020-03-08 19:23:48.177 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
 2020-03-08 19:23:48.182 +06:00 [INF] Request finished in 5.7695ms 200 application/json
+2020-03-08 19:23:50.193 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:23:50.198 +06:00 [INF] Request finished in 4.8377ms 200 application/json
+2020-03-08 19:23:52.207 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:23:52.213 +06:00 [INF] Request finished in 5.8748ms 200 application/json
+2020-03-08 19:23:54.220 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:23:54.225 +06:00 [INF] Request finished in 4.8249ms 200 application/json
+2020-03-08 19:23:56.232 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:23:56.237 +06:00 [INF] Request finished in 4.8392ms 200 application/json
+2020-03-08 19:23:58.247 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:23:58.253 +06:00 [INF] Request finished in 6.1854ms 200 application/json
+2020-03-08 19:24:00.268 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:00.273 +06:00 [INF] Request finished in 5.0679ms 200 application/json
+2020-03-08 19:24:02.297 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:02.315 +06:00 [INF] Request finished in 18.6991ms 200 application/json
+2020-03-08 19:24:04.330 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:04.345 +06:00 [INF] Request finished in 14.742ms 200 application/json
+2020-03-08 19:24:06.360 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:06.375 +06:00 [INF] Request finished in 14.3004ms 200 application/json
+2020-03-08 19:24:08.395 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:08.412 +06:00 [INF] Request finished in 16.9404ms 200 application/json
+2020-03-08 19:24:09.900 +06:00 [INF] Executed Command  SET NOCOUNT ON;  
+            DECLARE @objectid int;  
+            DECLARE @indexid int;  
+            DECLARE @partitioncount bigint;  
+            DECLARE @schemaname nvarchar(130);   
+            DECLARE @objectname nvarchar(130);   
+            DECLARE @indexname nvarchar(130);   
+            DECLARE @partitionnum bigint;  
+            DECLARE @partitions bigint;  
+            DECLARE @frag float;  
+            DECLARE @command nvarchar(4000);   
+            -- Conditionally select tables and indexes from the sys.dm_db_index_physical_stats function   
+            -- and convert object and index IDs to names.  
+            SELECT 
+                object_id AS objectid,  
+                index_id AS indexid,  
+                partition_number AS partitionnum,  
+                avg_fragmentation_in_percent AS frag  
+            INTO #work_to_do  
+            FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, 'LIMITED')  
+            WHERE avg_fragmentation_in_percent > 10.0 AND index_id > 0;  
+ 
+            -- Declare the cursor for the list of partitions to be processed.  
+            DECLARE partitions CURSOR FOR SELECT * FROM #work_to_do;  
+ 
+            -- Open the cursor.  
+            OPEN partitions;  
+ 
+            -- Loop through the partitions.  
+            WHILE (1=1)  
+                BEGIN;  
+                    FETCH NEXT 
+                        FROM partitions  
+                        INTO @objectid, @indexid, @partitionnum, @frag;  
+                    IF @@FETCH_STATUS < 0 BREAK;  
+                    SELECT @objectname = QUOTENAME(o.name), @schemaname = QUOTENAME(s.name)  
+                    FROM sys.objects AS o  
+                    JOIN sys.schemas as s ON s.schema_id = o.schema_id  
+                    WHERE o.object_id = @objectid;  
+                    SELECT @indexname = QUOTENAME(name)  
+                    FROM sys.indexes  
+                    WHERE  object_id = @objectid AND index_id = @indexid;  
+                    SELECT @partitioncount = count (*)  
+                    FROM sys.partitions  
+                    WHERE object_id = @objectid AND index_id = @indexid;  
+ 
+            -- 30 is an arbitrary decision point at which to switch between reorganizing and rebuilding.  
+                    IF @frag < 30.0  
+                        SET @command = N'ALTER INDEX ' + @indexname + N' ON ' + @schemaname + N'.' + @objectname + N' REORGANIZE';  
+                    IF @frag >= 30.0  
+                        SET @command = N'ALTER INDEX ' + @indexname + N' ON ' + @schemaname + N'.' + @objectname + N' REBUILD';  
+                    IF @partitioncount > 1  
+                        SET @command = @command + N' PARTITION=' + CAST(@partitionnum AS nvarchar(10));
+                    PRINT N'Executing: ' + @command;  
+            EXEC (@command);  
+                    PRINT N'Executed: ' + @command;  
+                END;  
+ 
+            -- Close and deallocate the cursor.  
+            CLOSE partitions;  
+            DEALLOCATE partitions;  
+ 
+            -- Drop the temporary table.  
+            DROP TABLE #work_to_do;
+2020-03-08 19:24:10.428 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:10.434 +06:00 [INF] Request finished in 6.7454ms 200 application/json
+2020-03-08 19:24:12.443 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:12.451 +06:00 [INF] Request finished in 7.9308ms 200 application/json
+2020-03-08 19:24:14.459 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:14.466 +06:00 [INF] Request finished in 6.2289ms 200 application/json
+2020-03-08 19:24:16.476 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:16.486 +06:00 [INF] Request finished in 10.4338ms 200 application/json
+2020-03-08 19:24:18.499 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:18.514 +06:00 [INF] Request finished in 14.822ms 200 application/json
+2020-03-08 19:24:20.538 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:20.565 +06:00 [INF] Request finished in 27.8716ms 200 application/json
+2020-03-08 19:24:22.594 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:22.600 +06:00 [INF] Request finished in 6.015ms 200 application/json
+2020-03-08 19:24:24.609 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:24.614 +06:00 [INF] Request finished in 5.3561ms 200 application/json
+2020-03-08 19:24:26.622 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:26.629 +06:00 [INF] Request finished in 6.6037ms 200 application/json
+2020-03-08 19:24:28.636 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:28.642 +06:00 [INF] Request finished in 6.1952ms 200 application/json
+2020-03-08 19:24:30.651 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:30.656 +06:00 [INF] Request finished in 5.1018ms 200 application/json
+2020-03-08 19:24:32.664 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:32.669 +06:00 [INF] Request finished in 5.334ms 200 application/json
+2020-03-08 19:24:34.677 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:34.684 +06:00 [INF] Request finished in 6.5822ms 200 application/json
+2020-03-08 19:24:36.698 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:36.718 +06:00 [INF] Request finished in 20.971ms 200 application/json
+2020-03-08 19:24:38.730 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:38.742 +06:00 [INF] Request finished in 11.3373ms 200 application/json
+2020-03-08 19:24:40.758 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:40.776 +06:00 [INF] Request finished in 17.7684ms 200 application/json
+2020-03-08 19:24:42.787 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:42.793 +06:00 [INF] Request finished in 6.3201ms 200 application/json
+2020-03-08 19:24:44.803 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:44.816 +06:00 [INF] Request finished in 12.7166ms 200 application/json
+2020-03-08 19:24:46.829 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:46.836 +06:00 [INF] Request finished in 7.8389ms 200 application/json
+2020-03-08 19:24:48.844 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:48.851 +06:00 [INF] Request finished in 6.4395ms 200 application/json
+2020-03-08 19:24:50.869 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:50.894 +06:00 [INF] Request finished in 24.8533ms 200 application/json
+2020-03-08 19:24:52.910 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:52.927 +06:00 [INF] Request finished in 16.5013ms 200 application/json
+2020-03-08 19:24:54.939 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:54.944 +06:00 [INF] Request finished in 5.5839ms 200 application/json
+2020-03-08 19:24:56.953 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:56.959 +06:00 [INF] Request finished in 6.3178ms 200 application/json
+2020-03-08 19:24:58.969 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:24:58.975 +06:00 [INF] Request finished in 6.3684ms 200 application/json
+2020-03-08 19:25:00.992 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:01.013 +06:00 [INF] Request finished in 23.1498ms 200 application/json
+2020-03-08 19:25:03.030 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:03.036 +06:00 [INF] Request finished in 5.6278ms 200 application/json
+2020-03-08 19:25:05.046 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:05.053 +06:00 [INF] Request finished in 8.1438ms 200 application/json
+2020-03-08 19:25:07.063 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:07.068 +06:00 [INF] Request finished in 5.4656ms 200 application/json
+2020-03-08 19:25:09.081 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:09.089 +06:00 [INF] Request finished in 7.3202ms 200 application/json
+2020-03-08 19:25:11.098 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:11.105 +06:00 [INF] Request finished in 6.4766ms 200 application/json
+2020-03-08 19:25:13.114 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:13.122 +06:00 [INF] Request finished in 7.4476ms 200 application/json
+2020-03-08 19:25:15.132 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:15.140 +06:00 [INF] Request finished in 7.9195ms 200 application/json
+2020-03-08 19:25:17.149 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:17.155 +06:00 [INF] Request finished in 6.1433ms 200 application/json
+2020-03-08 19:25:19.164 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:19.169 +06:00 [INF] Request finished in 5.3932ms 200 application/json
+2020-03-08 19:25:21.179 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:21.185 +06:00 [INF] Request finished in 5.8363ms 200 application/json
+2020-03-08 19:25:23.193 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:23.201 +06:00 [INF] Request finished in 7.2314ms 200 application/json
+2020-03-08 19:25:25.211 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:25.223 +06:00 [INF] Request finished in 11.9827ms 200 application/json
+2020-03-08 19:25:27.234 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:27.242 +06:00 [INF] Request finished in 8.3329ms 200 application/json
+2020-03-08 19:25:29.258 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:29.264 +06:00 [INF] Request finished in 6.1903ms 200 application/json
+2020-03-08 19:25:31.273 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:31.283 +06:00 [INF] Request finished in 10.1024ms 200 application/json
+2020-03-08 19:25:33.295 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:33.301 +06:00 [INF] Request finished in 6.0431ms 200 application/json
+2020-03-08 19:25:34.703 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/jobs/succeeded  
+2020-03-08 19:25:34.731 +06:00 [INF] Request finished in 28.4775ms 200 text/html
+2020-03-08 19:25:34.769 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/css1790  
+2020-03-08 19:25:34.771 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/js1790  
+2020-03-08 19:25:34.783 +06:00 [INF] Request finished in 14.3389ms 200 text/css
+2020-03-08 19:25:34.785 +06:00 [INF] Request finished in 14.0666ms 200 application/javascript
+2020-03-08 19:25:34.982 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/fonts/glyphicons-halflings-regular/woff2  
+2020-03-08 19:25:34.984 +06:00 [INF] Request finished in 1.8782ms 200 font/woff2
+2020-03-08 19:25:36.851 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/jobs/details/7  
+2020-03-08 19:25:36.862 +06:00 [INF] Request finished in 11.3036ms 200 text/html
+2020-03-08 19:25:36.906 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/js1790  
+2020-03-08 19:25:36.908 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/css1790  
+2020-03-08 19:25:36.919 +06:00 [INF] Request finished in 10.9669ms 200 text/css
+2020-03-08 19:25:36.960 +06:00 [INF] Request finished in 53.5261ms 200 application/javascript
+2020-03-08 19:25:37.131 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/fonts/glyphicons-halflings-regular/woff2  
+2020-03-08 19:25:37.133 +06:00 [INF] Request finished in 2.0391ms 200 font/woff2
+2020-03-08 19:25:39.110 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:39.119 +06:00 [INF] Request finished in 8.7019ms 200 application/json
+2020-03-08 19:25:41.133 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:41.139 +06:00 [INF] Request finished in 6.5517ms 200 application/json
+2020-03-08 19:25:43.148 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:43.156 +06:00 [INF] Request finished in 8.7501ms 200 application/json
+2020-03-08 19:25:45.167 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 392
+2020-03-08 19:25:45.178 +06:00 [INF] Request finished in 11.0561ms 200 application/json
+2020-03-08 19:25:45.989 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/recurring  
+2020-03-08 19:25:46.011 +06:00 [INF] Request finished in 21.885ms 200 text/html
+2020-03-08 19:25:46.074 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/css1790  
+2020-03-08 19:25:46.075 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/js1790  
+2020-03-08 19:25:46.090 +06:00 [INF] Request finished in 16.6436ms 200 text/css
+2020-03-08 19:25:46.093 +06:00 [INF] Request finished in 17.6833ms 200 application/javascript
+2020-03-08 19:25:46.198 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/fonts/glyphicons-halflings-regular/woff2  
+2020-03-08 19:25:46.201 +06:00 [INF] Request finished in 3.5451ms 200 font/woff2
+2020-03-08 19:25:48.179 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:25:48.185 +06:00 [INF] Request finished in 6.1116ms 200 application/json
+2020-03-08 19:25:50.195 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:25:50.203 +06:00 [INF] Request finished in 7.8653ms 200 application/json
+2020-03-08 19:25:53.279 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/recurring/remove application/x-www-form-urlencoded; charset=UTF-8 23
+2020-03-08 19:25:53.283 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:25:53.288 +06:00 [INF] Request finished in 5.0474ms 200 application/json
+2020-03-08 19:25:53.330 +06:00 [INF] Request finished in 50.6988ms 204 
+2020-03-08 19:25:53.337 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/recurring  
+2020-03-08 19:25:53.384 +06:00 [INF] Request finished in 47.5732ms 200 text/html
+2020-03-08 19:25:53.430 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/css1790  
+2020-03-08 19:25:53.432 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/js1790  
+2020-03-08 19:25:53.439 +06:00 [INF] Request finished in 9.2542ms 200 text/css
+2020-03-08 19:25:53.461 +06:00 [INF] Request finished in 29.3352ms 200 application/javascript
+2020-03-08 19:25:53.558 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/fonts/glyphicons-halflings-regular/woff2  
+2020-03-08 19:25:53.566 +06:00 [INF] Request finished in 7.9044ms 200 font/woff2
+2020-03-08 19:25:55.537 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:25:55.543 +06:00 [INF] Request finished in 5.9461ms 200 application/json
+2020-03-08 19:25:55.621 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/recurring  
+2020-03-08 19:25:55.632 +06:00 [INF] Request finished in 11.1897ms 200 text/html
+2020-03-08 19:25:55.703 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/css1790  
+2020-03-08 19:25:55.742 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/js1790  
+2020-03-08 19:25:55.772 +06:00 [INF] Request finished in 68.3913ms 200 text/css
+2020-03-08 19:25:55.782 +06:00 [INF] Request finished in 47.7998ms 200 application/javascript
+2020-03-08 19:25:55.867 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/fonts/glyphicons-halflings-regular/woff2  
+2020-03-08 19:25:55.870 +06:00 [INF] Request finished in 2.6149ms 200 font/woff2
+2020-03-08 19:25:55.940 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/favicon.ico  
+2020-03-08 19:25:55.975 +06:00 [INF] Sending file. Request path: '/favicon.ico'. Physical path: 'C:\Users\Emon\source\repos\WorkerService1\ThreeS.Routine\wwwroot\favicon.ico'
+2020-03-08 19:25:55.977 +06:00 [INF] Request finished in 36.9839ms 200 image/x-icon
+2020-03-08 19:25:57.972 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:25:58.000 +06:00 [INF] Request finished in 28.2322ms 200 application/json
+2020-03-08 19:25:58.718 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/recurring  
+2020-03-08 19:25:58.728 +06:00 [INF] Request finished in 10.8311ms 200 text/html
+2020-03-08 19:25:58.791 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/css1790  
+2020-03-08 19:25:58.792 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/js1790  
+2020-03-08 19:25:58.843 +06:00 [INF] Request finished in 52.2565ms 200 text/css
+2020-03-08 19:25:58.859 +06:00 [INF] Request finished in 67.4438ms 200 application/javascript
+2020-03-08 19:25:58.954 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/jobs/fonts/glyphicons-halflings-regular/woff2  
+2020-03-08 19:25:58.956 +06:00 [INF] Request finished in 2.4374ms 200 font/woff2
+2020-03-08 19:25:59.030 +06:00 [INF] Request starting HTTP/2.0 GET https://localhost:44392/favicon.ico  
+2020-03-08 19:25:59.037 +06:00 [INF] Sending file. Request path: '/favicon.ico'. Physical path: 'C:\Users\Emon\source\repos\WorkerService1\ThreeS.Routine\wwwroot\favicon.ico'
+2020-03-08 19:25:59.040 +06:00 [INF] Request finished in 9.8309ms 200 image/x-icon
+2020-03-08 19:26:00.931 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:00.937 +06:00 [INF] Request finished in 6.4118ms 200 application/json
+2020-03-08 19:26:02.946 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:02.953 +06:00 [INF] Request finished in 6.4432ms 200 application/json
+2020-03-08 19:26:04.962 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:04.968 +06:00 [INF] Request finished in 5.7651ms 200 application/json
+2020-03-08 19:26:06.978 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:06.983 +06:00 [INF] Request finished in 5.8218ms 200 application/json
+2020-03-08 19:26:08.992 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:08.998 +06:00 [INF] Request finished in 6.6957ms 200 application/json
+2020-03-08 19:26:11.007 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:11.013 +06:00 [INF] Request finished in 6.3504ms 200 application/json
+2020-03-08 19:26:13.117 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:13.122 +06:00 [INF] Request finished in 5.2274ms 200 application/json
+2020-03-08 19:26:16.135 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:16.143 +06:00 [INF] Request finished in 8.3868ms 200 application/json
+2020-03-08 19:26:19.120 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:19.131 +06:00 [INF] Request finished in 10.6762ms 200 application/json
+2020-03-08 19:26:22.118 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:22.124 +06:00 [INF] Request finished in 6.1333ms 200 application/json
+2020-03-08 19:26:25.132 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:25.146 +06:00 [INF] Request finished in 13.5598ms 200 application/json
+2020-03-08 19:26:28.116 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:28.121 +06:00 [INF] Request finished in 4.5898ms 200 application/json
+2020-03-08 19:26:31.126 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:31.134 +06:00 [INF] Request finished in 8.0123ms 200 application/json
+2020-03-08 19:26:34.170 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:34.177 +06:00 [INF] Request finished in 7.0303ms 200 application/json
+2020-03-08 19:26:35.767 +06:00 [INF] 2 servers were removed due to timeout
+2020-03-08 19:26:37.126 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:37.132 +06:00 [INF] Request finished in 5.6758ms 200 application/json
+2020-03-08 19:26:40.135 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:40.145 +06:00 [INF] Request finished in 11.0405ms 200 application/json
+2020-03-08 19:26:43.129 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:43.139 +06:00 [INF] Request finished in 10.6315ms 200 application/json
+2020-03-08 19:26:46.122 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:46.136 +06:00 [INF] Request finished in 14.5543ms 200 application/json
+2020-03-08 19:26:49.119 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:49.124 +06:00 [INF] Request finished in 5.3191ms 200 application/json
+2020-03-08 19:26:52.126 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:52.132 +06:00 [INF] Request finished in 6.5455ms 200 application/json
+2020-03-08 19:26:55.128 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:55.138 +06:00 [INF] Request finished in 9.5198ms 200 application/json
+2020-03-08 19:26:58.128 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:26:58.139 +06:00 [INF] Request finished in 11.5792ms 200 application/json
+2020-03-08 19:27:01.117 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:01.123 +06:00 [INF] Request finished in 6.0399ms 200 application/json
+2020-03-08 19:27:04.122 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:04.126 +06:00 [INF] Request finished in 4.849ms 200 application/json
+2020-03-08 19:27:07.119 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:07.128 +06:00 [INF] Request finished in 9.1825ms 200 application/json
+2020-03-08 19:27:10.118 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:10.124 +06:00 [INF] Request finished in 6.0334ms 200 application/json
+2020-03-08 19:27:13.117 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:13.123 +06:00 [INF] Request finished in 5.2216ms 200 application/json
+2020-03-08 19:27:16.121 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:16.128 +06:00 [INF] Request finished in 6.7155ms 200 application/json
+2020-03-08 19:27:19.123 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:19.135 +06:00 [INF] Request finished in 12.1099ms 200 application/json
+2020-03-08 19:27:22.128 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:22.143 +06:00 [INF] Request finished in 14.4443ms 200 application/json
+2020-03-08 19:27:25.131 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:25.142 +06:00 [INF] Request finished in 11.2489ms 200 application/json
+2020-03-08 19:27:28.116 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:28.121 +06:00 [INF] Request finished in 5.816ms 200 application/json
+2020-03-08 19:27:31.132 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:31.142 +06:00 [INF] Request finished in 10.2079ms 200 application/json
+2020-03-08 19:27:34.122 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:34.129 +06:00 [INF] Request finished in 6.5426ms 200 application/json
+2020-03-08 19:27:37.167 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:37.175 +06:00 [INF] Request finished in 7.9604ms 200 application/json
+2020-03-08 19:27:40.147 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:40.156 +06:00 [INF] Request finished in 8.6686ms 200 application/json
+2020-03-08 19:27:43.126 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:43.131 +06:00 [INF] Request finished in 4.9094ms 200 application/json
+2020-03-08 19:27:46.122 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:46.129 +06:00 [INF] Request finished in 6.8716ms 200 application/json
+2020-03-08 19:27:49.129 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:49.139 +06:00 [INF] Request finished in 10.1015ms 200 application/json
+2020-03-08 19:27:52.134 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:52.143 +06:00 [INF] Request finished in 9.656ms 200 application/json
+2020-03-08 19:27:55.124 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:55.129 +06:00 [INF] Request finished in 5.7438ms 200 application/json
+2020-03-08 19:27:58.118 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:27:58.124 +06:00 [INF] Request finished in 5.8791ms 200 application/json
+2020-03-08 19:28:01.119 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:01.124 +06:00 [INF] Request finished in 5.7278ms 200 application/json
+2020-03-08 19:28:04.121 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:04.128 +06:00 [INF] Request finished in 7.2468ms 200 application/json
+2020-03-08 19:28:07.166 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:07.175 +06:00 [INF] Request finished in 9.0813ms 200 application/json
+2020-03-08 19:28:10.123 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:10.136 +06:00 [INF] Request finished in 12.8755ms 200 application/json
+2020-03-08 19:28:13.120 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:13.130 +06:00 [INF] Request finished in 10.3678ms 200 application/json
+2020-03-08 19:28:16.115 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:16.121 +06:00 [INF] Request finished in 5.4072ms 200 application/json
+2020-03-08 19:28:18.344 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:18.350 +06:00 [INF] Request finished in 6.3759ms 200 application/json
+2020-03-08 19:28:21.198 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:21.203 +06:00 [INF] Request finished in 9.9649ms 200 application/json
+2020-03-08 19:28:24.312 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:24.319 +06:00 [INF] Request finished in 6.3119ms 200 application/json
+2020-03-08 19:28:27.207 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:27.218 +06:00 [INF] Request finished in 10.9159ms 200 application/json
+2020-03-08 19:28:30.124 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:30.130 +06:00 [INF] Request finished in 6.2234ms 200 application/json
+2020-03-08 19:28:33.122 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:33.132 +06:00 [INF] Request finished in 10.1145ms 200 application/json
+2020-03-08 19:28:36.268 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:36.275 +06:00 [INF] Request finished in 6.386ms 200 application/json
+2020-03-08 19:28:39.117 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:39.125 +06:00 [INF] Request finished in 8.4512ms 200 application/json
+2020-03-08 19:28:41.135 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:41.140 +06:00 [INF] Request finished in 5.8276ms 200 application/json
+2020-03-08 19:28:44.119 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:44.127 +06:00 [INF] Request finished in 8.7899ms 200 application/json
+2020-03-08 19:28:47.125 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:47.134 +06:00 [INF] Request finished in 9.0601ms 200 application/json
+2020-03-08 19:28:50.128 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:50.139 +06:00 [INF] Request finished in 10.408ms 200 application/json
+2020-03-08 19:28:53.131 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:53.137 +06:00 [INF] Request finished in 6.0481ms 200 application/json
+2020-03-08 19:28:56.116 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:56.121 +06:00 [INF] Request finished in 5.0337ms 200 application/json
+2020-03-08 19:28:59.116 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:28:59.121 +06:00 [INF] Request finished in 5.0369ms 200 application/json
+2020-03-08 19:29:02.129 +06:00 [INF] Request starting HTTP/2.0 POST https://localhost:44392/jobs/stats application/x-www-form-urlencoded; charset=UTF-8 167
+2020-03-08 19:29:02.141 +06:00 [INF] Request finished in 12.8566ms 200 application/json
