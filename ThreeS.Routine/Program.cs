@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 
 using Serilog;
+using Serilog.Events;
 
 using System;
 using System.IO;
@@ -17,7 +18,8 @@ namespace ThreeS.Routine
 
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(GetConfig(args))
-                 .WriteTo.Debug().AuditTo.File("audit.txt")
+                .WriteTo.SQLite(@"logs\log.db", restrictedToMinimumLevel: LogEventLevel.Error)
+                .WriteTo.Debug().AuditTo.File(@"logs\audit.txt")
                 .CreateLogger();
 
             try

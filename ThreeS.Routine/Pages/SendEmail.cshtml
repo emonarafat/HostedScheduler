@@ -1,0 +1,33 @@
+﻿@page
+@model ThreeS.Routine.SendEmailModel
+@{
+    ViewData["Title"] = "SendEmail";
+}
+
+<div class="row">
+    <div class="col-6">
+        <label class="alert alert-success">@Model.EmailStatusMessage</label>
+    </div>
+</div>
+<div class="row">
+    <div class="col-6">
+        <form method="post">
+            <div class="form-group">
+                <label asp-for="Email"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Subject"></label>
+                <input asp-for="Subject" class="form-control" />
+                <span asp-validation-for="Subject" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Body"></label>
+                <input asp-for="Body" class="form-control" />
+                <span asp-validation-for="Body" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">Email Test</button>
+        </form>
+    </div>
+</div>

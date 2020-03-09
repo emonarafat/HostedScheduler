@@ -93,7 +93,9 @@ namespace ThreeS.Routine
             // services.AddScoped<IDbConnection>(f => new SqlConnection(Configuration.GetConnectionString("WorkerConnetion")));
             services.AddTransient<IDbConnectionFactory, DapperDbConnectionFactory>();
             services.AddScoped<ISQLJobs, SQLJobs>();
+            services.AddSingleton<IEmailSender, EmailSender>();
             services.Configure<AppConfig>(options => Configuration.GetSection("AppConfig").Bind(options));
+            services.Configure<EmailSettings>(Configuration.GetSection("EmailSettings"));
             //services.AddDbContext<DataProtectionContext>(options =>
             //  options.UseSqlite("Data Source=dtprotection.sqlite3")).AddAntiforgery();
             // using Microsoft.AspNetCore.DataProtection;
@@ -103,8 +105,8 @@ namespace ThreeS.Routine
                 .AddEntityFrameworkStores<ApplicationDbContext>();
             services.AddSingleton(new BackgroundJobServerOptions
             {
-                WorkerCount = 1,
-                ServerName = "TaskSvcHangfireServer"
+                WorkerCount = 2,
+                ServerName = "TaskSvcServer"
             });
             services.AddHangfire(configuration => configuration
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
