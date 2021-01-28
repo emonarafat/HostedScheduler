@@ -61,11 +61,12 @@ namespace ThreeS.Routine
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseHangfireServer();
-            app.UseHangfireDashboard("/jobs", new DashboardOptions()
+            app.UseHangfireDashboard("/dashboard", new DashboardOptions()
             {
                 DisplayStorageConnectionString = false,
+                //PrefixPath="jobs",
                 // Authorization = new[] { new CustomAuthorizeFilter() },
-                DashboardTitle = "Scheduled Jobs Overview"
+                DashboardTitle = "Dashboard"
             });
             app.UseCookiePolicy();
 
@@ -105,17 +106,22 @@ namespace ThreeS.Routine
                 .AddEntityFrameworkStores<ApplicationDbContext>();
             services.AddSingleton(new BackgroundJobServerOptions
             {
-                WorkerCount = 2,
-                ServerName = "TaskSvcServer"
+                WorkerCount = 1,
+                ServerName = "TaskSvcServer",
+
             });
-            services.AddHangfire(configuration => configuration
-        .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
-        .UseSimpleAssemblyNameTypeSerializer().UseSerilogLogProvider()
-        .UseRecommendedSerializerSettings()
-        .UseSQLiteStorage("Filename=ThreeSDB.sqlite3;", new SQLiteStorageOptions
-        {
-            TransactionIsolationLevel = System.Data.IsolationLevel.ReadCommitted
-        }));
+            services.AddHangfire(configuration =>
+            {
+                configuration.SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
+                        .UseSimpleAssemblyNameTypeSerializer()
+                        .UseSerilogLogProvider()
+                        .UseRecommendedSerializerSettings()
+                        .UseSQLiteStorage("Filename=ThreeSDB.sqlite3;", new SQLiteStorageOptions
+                        {
+                            TransactionIsolationLevel = System.Data.IsolationLevel.ReadCommitted,
+                            PrepareSchemaIfNecessary = true
+                        });
+            });
             services.Configure<IdentityOptions>(options =>
             {
                 // Password settings.

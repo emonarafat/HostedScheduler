@@ -5,7 +5,11 @@ VisualStudioVersion = 16.0.29728.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ThreeS.Routine", "ThreeS.Routine\ThreeS.Routine.csproj", "{7088E7C0-CD83-4575-AED9-5ADB1237C4EA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreeS.Jobs", "ThreeS.Jobs\ThreeS.Jobs.csproj", "{F44D4968-ACA3-4BBB-A842-E69129BB1D89}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ThreeS.Jobs", "ThreeS.Jobs\ThreeS.Jobs.csproj", "{F44D4968-ACA3-4BBB-A842-E69129BB1D89}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Hangfire.Core", "Hangfire\Hangfire.Core\Hangfire.Core.csproj", "{AD7E1C98-E844-4ADE-9A52-0A8FFE6BB8FD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Hangfire.AspNetCore", "Hangfire\Hangfire.AspNetCore\Hangfire.AspNetCore.csproj", "{77119D9B-BC78-488E-8D8F-A004DA514239}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,14 @@ Global
 		{F44D4968-ACA3-4BBB-A842-E69129BB1D89}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F44D4968-ACA3-4BBB-A842-E69129BB1D89}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F44D4968-ACA3-4BBB-A842-E69129BB1D89}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD7E1C98-E844-4ADE-9A52-0A8FFE6BB8FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD7E1C98-E844-4ADE-9A52-0A8FFE6BB8FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD7E1C98-E844-4ADE-9A52-0A8FFE6BB8FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD7E1C98-E844-4ADE-9A52-0A8FFE6BB8FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77119D9B-BC78-488E-8D8F-A004DA514239}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77119D9B-BC78-488E-8D8F-A004DA514239}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77119D9B-BC78-488E-8D8F-A004DA514239}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77119D9B-BC78-488E-8D8F-A004DA514239}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

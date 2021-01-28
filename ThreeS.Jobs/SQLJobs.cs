@@ -46,7 +46,7 @@ namespace ThreeS.Jobs
         ///// <summary>
         ///// The ExecuteAsync
         ///// </summary>
-        ///// 
+        /////
         //public void RebuildAllIndex()
         //{
 

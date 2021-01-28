@@ -35,10 +35,10 @@
         {
             //RecurringJob.RemoveIfExists("RebuildIndex");
             //RecurringJob.AddOrUpdate("RebuildIndex", () => _sQLJobs.RebuildAllIndex(), Cron.Weekly(), timeZone: TimeZoneInfo.Local);
-            RecurringJob.RemoveIfExists("RebuildOrReorganizeIndexes");
-            RecurringJob.AddOrUpdate("RebuildOrReorganizeIndexes", () => _sQLJobs.RebuildOrReorganizeIndexes(), Cron.Weekly(), timeZone: TimeZoneInfo.Local);
-            RecurringJob.RemoveIfExists("ShrinkDatabase");
-            RecurringJob.AddOrUpdate("ShrinkDatabase", () => _sQLJobs.ShrinkDataBases(), Cron.Weekly(), timeZone: TimeZoneInfo.Local);
+            //RecurringJob.RemoveIfExists("RebuildOrReorganizeIndexes");
+            //RecurringJob.AddOrUpdate("RebuildOrReorganizeIndexes", () => _sQLJobs.RebuildOrReorganizeIndexes(), Cron.Weekly(), timeZone: TimeZoneInfo.Local);
+            //RecurringJob.RemoveIfExists("ShrinkDatabase");
+            //RecurringJob.AddOrUpdate("ShrinkDatabase", () => _sQLJobs.ShrinkDataBases(), Cron.Weekly(), timeZone: TimeZoneInfo.Local);
         }
     }
 }
